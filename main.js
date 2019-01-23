@@ -1,5 +1,14 @@
 var abi = [
-    {
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "cambiarEstado",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"constant": false,
 		"inputs": [
 			{
@@ -7,14 +16,28 @@ var abi = [
 				"type": "uint256"
 			},
 			{
-				"name": "rut",
-				"type": "bytes32"
+				"name": "dni",
+				"type": "string"
 			}
 		],
 		"name": "comprarEntrada",
 		"outputs": [],
 		"payable": true,
 		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "monto",
+				"type": "uint256"
+			}
+		],
+		"name": "retirarETH",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -66,25 +89,11 @@ var abi = [
 				"type": "address"
 			},
 			{
-				"name": "rut",
-				"type": "bytes32"
+				"name": "dni",
+				"type": "string"
 			},
 			{
 				"name": "entradasCompradas",
-				"type": "uint256"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [],
-		"name": "fechaTermino",
-		"outputs": [
-			{
-				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -146,7 +155,7 @@ var abi = [
 		"outputs": [
 			{
 				"name": "",
-				"type": "bytes32"
+				"type": "string"
 			},
 			{
 				"name": "",
@@ -157,59 +166,92 @@ var abi = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-]; // el abi del contrato
-var direccionContrato = "0xdec5459c41dea417d50e3f490aff067ac629c5ed"; // la dirección de tu contrato
+]
+var addressContrato = "0x1d5cf5cc8cfd9654b3303ae1e6547d84d8b22299";
 var contrato = web3.eth.contract(abi);
-var funcionesContrato = contrato.at(direccionContrato);
+var funcionesContrato = contrato.at(addressContrato);
 
-function comprarEntrada() { 
-	
-	var nEntradas = $("input[name=numeroEntradas").val(); // obtengo el valor del input
-	var dni = $("input[name=dni").val(); // obtengo el valor del input
+$(document).ready(function(){
+	if (typeof web3 !== 'undefined') {
+		web3 = new Web3(web3.currentProvider);
+	} else {
+		web3 = new Web3(new Web3.providers.HttpProvider("https://rinkeby.infura.io"));
+	}
 
-	funcionesContrato.comprarEntrada(nEntradas, dni, function(error, respuesta){
+	getNumeroEntradas();
+	getNombreEvento();
+	getCreadorEvento();
+	getValorEntradas();
+});
 
+function verEntrada() {
+	let id_entrada = $('#id_entrada').val();
+	funcionesContrato.entradas(id_entrada, function(error, respuesta){
 		if(error) throw error; // NO firmó la transacción en Metamask
+		var rutEntrada = respuesta[1]; // recibimos hex y lo pasamos a ascii
+		//rutEntrada = rutEntrada.match(/[0-9\.\-k]+/)[0] // eliminamos caracteres innecesarios
+		var numeroEntradas = respuesta[2].c[0]; // obtenemos el n° de entradas
+		$('#info_entrada').html('<div class="alert alert-primary" role="alert">DNI <strong>'+rutEntrada+'</strong> - Entradas <strong>'+numeroEntradas+'</strong></div>');
+	});
+}
+
+function comprarEntrada() {		
+	let cantidad = $('#cantidad_entradas').val();
+	let dni = $('#dni').val();
+	let wei = $('#wei').val();
+	let wei_esperado = cantidad * 100;
+
+	if(wei_esperado > wei){
+		alert('Ingrese más WEI');
+		return false;
+	} else {
+		console.log(wei_esperado);
+	}
+
+	
+	funcionesContrato.comprarEntrada(cantidad, dni, {value: wei}, (err, res) => {
+		if(err) throw err; // NO firmó la transacción en Metamask
 		alert("Entrada comprada"); // "respuesta" == txhash de la transacción
 	});
 }
 
-var codigoEntrada = 1337; // uint
+function consultarInformacionEntrada(codigoEntrada) {	
+	funcionesContrato.verEntrada(codigoEntrada, function(error, respuesta){
+		if(error) throw error; // NO firmó la transacción en Metamask
+		var rutEntrada = web3.toAscii(respuesta[0]); // recibimos hex y lo pasamos a ascii
+		rutEntrada = rutEntrada.match(/[0-9\.\-k]+/)[0] // eliminamos caracteres innecesarios
+		var numeroEntradas = respuesta[1].c[0]; // obtenemos el n° de entradas
+		console.log("DNI:" + rutEntrada + " N° entradas:" + numeroEntradas);
+	});
+}
 
-funcionesContrato.verEntrada(codigoEntrada, function(error, respuesta){
-	if(error) throw error; // NO firmó la transacción en Metamask
-	var rutEntrada = web3.toAscii(respuesta[0]); // recibimos hex y lo pasamos a ascii
-	rutEntrada = rutEntrada.match(/[0-9\.\-k]+/)[0] // eliminamos caracteres innecesarios
-	var numeroEntradas = respuesta[1].c[0]; // obtenemos el n° de entradas
-	console.log("Rut:" + rutEntrada + " N° entradas:" + numeroEntradas);
-});
+function getValorEntradas() {
+	funcionesContrato.valorEntradas(function (error, respuesta) {
+		if(error) throw error;
+		var valor_entradas = respuesta.c[0];
+		$('#valor_entradas').html(valor_entradas + ' WEI');
+	})
+}
 
-funcionesContrato.entradas(1337, function(error, respuesta){
-	if(error) throw error; // NO firmó la transacción en Metamask
-	var rutEntrada = web3.toAscii(respuesta[1]); // recibimos hex y lo pasamos a ascii
-	rutEntrada = rutEntrada.match(/[0-9\.\-k]+/)[0] // eliminamos caracteres innecesarios
-	var numeroEntradas = respuesta[2].c[0]; // obtenemos el n° de entradas
-	console.log("Rut:" + rutEntrada + " | N° entradas: " + numeroEntradas);
-});
+function getCreadorEvento() {
+	funcionesContrato.creadorEvento(function (error, respuesta) {
+		if(error) throw error;
+		$('#creador_evento').html(respuesta);
+	})
+}
 
-funcionesContrato.numeroEntradas(function(error, respuesta){
-	if(error) throw error;
-	var entradasDisponibles = respuesta.c[0];
-	console.log("Entradas disponibles:" + entradasDisponibles);
-});
+function getNombreEvento() {
+	funcionesContrato.nombreEvento(function(error, respuesta){
+		if(error) throw error;
+		$('#nombre_evento').html(respuesta);
+	});
+}
 
 
-funcionesContrato.nombreEvento(function(error, respuesta){
-	if(error) throw error;
-	console.log("Nombre evento:" + respuesta)
-});
-
-funcionesContrato.nombreEvento(function(error, respuesta){
-	if(error) throw error;
-	console.log("Nombre evento:" + respuesta)
-});
-
-funcionesContrato.cambiarEstado(function(error, respuesta){
-	if(error) throw error;
-	console.log("Hash transacción:" + respuesta)
-});
+function getNumeroEntradas() {	
+	funcionesContrato.numeroEntradas(function(error, respuesta){
+		if(error) throw error;
+		var entradasDisponibles = respuesta.c[0];
+		$('#entradas_disponibles').html(entradasDisponibles);
+	});
+}
